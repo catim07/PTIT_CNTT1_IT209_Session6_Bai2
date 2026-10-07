@@ -1,73 +1,59 @@
-# Bài 2: Áp dụng Kỹ thuật Stash để Quản lý Công việc Đang Dở dở (Git Stash Workflows)
+# Bài 2: Quản trị Tường lửa UFW cho Cụm Dịch vụ Multi-port
 
 ## Mục tiêu
-- Sử dụng `git stash` để lưu tạm các thay đổi chưa commit khi cần chuyển sang xử lý tác vụ khẩn cấp.
-- Khôi phục công việc lưu tạm và quản lý danh sách stash (`stash list`, `stash pop`, `stash drop`).
+- Thiết lập tường lửa UFW bảo vệ cụm dịch vụ chạy multi-port: SSH (22), Nginx HTTP (80), Spring Boot (8082).
+- Cô lập cổng hệ quản trị cơ sở dữ liệu MySQL (3306) khỏi truy cập từ bên ngoài Internet.
 
 ---
 
-## 1. Bối cảnh & Các bước thực hiện
+## 1. Các bước Cấu hình Tường lửa UFW
 
-### Bước 1: Phát triển dở dang trên nhánh `feature/checkout`
-Giả sử đang thực hiện tính năng thanh toán nhưng có thay đổi chưa commit:
+### Bước 1: Khai báo chính sách mặc định
 ```bash
-echo "const cart = [];" > checkout.js
-echo "// Work in progress logic..." >> checkout.js
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
 ```
 
-Kiểm tra trạng thái làm việc (`git status`):
-```text
-On branch feature/checkout
-Changes not staged for commit:
-  modified:   checkout.js
-```
-
-### Bước 2: Tạm cất thay đổi bằng `git stash`
-Do cần chuyển gấp sang sửa lỗi Hotfix, tiến hành cất giữ trạng thái hiện tại:
+### Bước 2: Cho phép các cổng dịch vụ công khai
 ```bash
-git stash save "WIP: dang lam do tinh nang checkout"
+# Cho phép SSH quản trị
+sudo ufw allow 22/tcp
+
+# Cho phép Nginx Web Server
+sudo ufw allow 80/tcp
+
+# Cho phép Spring Boot Application
+sudo ufw allow 8082/tcp
 ```
 
-Kiểm tra thư mục làm việc sau khi stash:
+### Bước 3: Kích hoạt tường lửa
 ```bash
-git status
-# Working tree clean
-```
-
-### Bước 3: Kiểm tra danh sách Stash
-```bash
-git stash list
-```
-
-**Kết quả màn hình:**
-```text
-stash@{0}: On feature/checkout: WIP: dang lam do tinh nang checkout
-```
-
-### Bước 4: Khôi phục công việc sau khi hoàn thành tác vụ khẩn cấp
-Sau khi hoàn thành tác vụ khác, quay lại nhánh `feature/checkout` và khôi phục mã nguồn:
-```bash
-git stash pop
+sudo ufw enable
 ```
 
 ---
 
-## 2. Kết quả sau khi Khôi phục
+## 2. Kiểm tra Trạng thái UFW (`sudo ufw status verbose`)
 
 ```bash
-git status
-```
+$ sudo ufw status verbose
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
 
-**Màn hình kết quả:**
-```text
-On branch feature/checkout
-Changes not staged for commit:
-  modified:   checkout.js
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere                  
+80/tcp                     ALLOW IN    Anywhere                  
+8082/tcp                   ALLOW IN    Anywhere                  
+22/tcp (v6)                ALLOW IN    Anywhere (v6)             
+80/tcp (v6)                ALLOW IN    Anywhere (v6)             
+8082/tcp (v6)              ALLOW IN    Anywhere (v6)             
 ```
-
-Nội dung mã dở dang trong file `checkout.js` đã được khôi phục đầy đủ.
 
 ---
 
-## 3. Kết luận
-- `git stash` giúp lập trình viên linh hoạt chuyển đổi giữa các nhánh và tác vụ mà không bị ràng buộc phải commit các mã nguồn chưa hoàn chỉnh hoặc rác vào lịch sử Git.
+## 3. Đánh giá Bảo mật
+- Cổng **3306/tcp (MySQL)** hoàn toàn không có trong quy tắc `ALLOW IN`, đảm bảo dữ liệu chỉ có thể kết nối nội bộ từ `127.0.0.1`.
+- Tất cả cổng đi vào khác mặc định bị từ chối (`Default: deny incoming`).
